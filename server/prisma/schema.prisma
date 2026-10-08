@@ -1,0 +1,450 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+enum ProductType {
+  SIMPLE
+  VARIANT
+  SERVICE
+}
+enum ProductRelationType {
+  RELATED
+  ANALOG
+  ACCESSORY
+  UPSELL
+}
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+}
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+}
+enum OrderStatus {
+  DRAFT
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  EXPIRED
+}
+enum PaymentMethod {
+  CARD
+  APPLE_PAY
+  GOOGLE_PAY
+  BANK_TRANSFER
+  CASH_ON_DELIVERY
+  CASH
+}
+enum PaymentProvider {
+  LIQPAY
+  WAYFORPAY
+  MONOBANK
+  BANK
+  MANUAL
+  OTHER
+}
+enum TransactionType {
+  AUTHORIZATION
+  CAPTURE
+  REFUND
+  VOID
+}
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+enum DeliveryStatus {
+  PENDING
+  READY_FOR_SHIPMENT
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+enum DocumentType {
+  INVOICE
+  RECEIPT
+  WAYBILL
+  ACT
+  OTHER
+}
+enum SyncDirection {
+  INBOUND
+  OUTBOUND
+}
+enum SyncStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model Category {
+  id String @id @default(uuid()) @db.Uuid
+  parentId String? @db.Uuid
+  parent Category? @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  name String @db.VarChar(180)
+  slug String @unique @db.VarChar(200)
+  description String?
+  sortOrder Int @default(0)
+  status RecordStatus @default(ACTIVE)
+  products Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([parentId, status])
+}
+
+model Brand {
+  id String @id @default(uuid()) @db.Uuid
+  name String @unique @db.VarChar(180)
+  slug String @unique @db.VarChar(200)
+  description String?
+  logoUrl String?
+  status RecordStatus @default(ACTIVE)
+  products Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id String @id @default(uuid()) @db.Uuid
+  sku String @unique @db.VarChar(100)
+  manufacturerSku String? @db.VarChar(100)
+  barcode String? @unique @db.VarChar(100)
+  name String @db.VarChar(255)
+  slug String @unique @db.VarChar(280)
+  description String?
+  shortDescription String?
+  type ProductType @default(SIMPLE)
+  status RecordStatus @default(ACTIVE)
+  isVisible Boolean @default(true)
+  categoryId String? @db.Uuid
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brandId String? @db.Uuid
+  brand Brand? @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  images ProductImage[]
+  documents ProductDocument[]
+  characteristics ProductCharacteristic[]
+  relationsFrom ProductRelation[] @relation("RelationSource")
+  relationsTo ProductRelation[] @relation("RelationTarget")
+  prices Price[]
+  stocks Stock[]
+  cartItems CartItem[]
+  orderItems OrderItem[]
+  externalReferences ExternalReference[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([categoryId, status, isVisible])
+  @@index([brandId])
+  @@index([name])
+}
+
+model ProductImage {
+  id String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url String
+  alt String?
+  sortOrder Int @default(0)
+  isPrimary Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@index([productId, sortOrder])
+}
+
+model ProductDocument {
+  id String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name String @db.VarChar(200)
+  url String
+  mimeType String? @db.VarChar(120)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  @@index([productId])
+}
+
+model ProductRelation {
+  id String @id @default(uuid()) @db.Uuid
+  sourceProductId String @db.Uuid
+  sourceProduct Product @relation("RelationSource", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  targetProductId String @db.Uuid
+  targetProduct Product @relation("RelationTarget", fields: [targetProductId], references: [id], onDelete: Cascade)
+  type ProductRelationType
+  sortOrder Int @default(0)
+  @@unique([sourceProductId, targetProductId, type])
+  @@index([sourceProductId, type])
+}
+
+model Characteristic {
+  id String @id @default(uuid()) @db.Uuid
+  key String @unique @db.VarChar(100)
+  name String @db.VarChar(180)
+  unit String? @db.VarChar(40)
+  dataType String @default("text") @db.VarChar(30)
+  values ProductCharacteristic[]
+}
+
+model ProductCharacteristic {
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  characteristicId String @db.Uuid
+  characteristic Characteristic @relation(fields: [characteristicId], references: [id], onDelete: Cascade)
+  value String
+  @@id([productId, characteristicId])
+}
+
+model Customer {
+  id String @id @default(uuid()) @db.Uuid
+  type CustomerType @default(INDIVIDUAL)
+  email String? @db.VarChar(254)
+  phone String? @db.VarChar(40)
+  firstName String? @db.VarChar(120)
+  lastName String? @db.VarChar(120)
+  companyName String? @db.VarChar(200)
+  taxId String? @db.VarChar(40)
+  status RecordStatus @default(ACTIVE)
+  carts Cart[]
+  orders Order[]
+  externalReferences ExternalReference[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([email])
+  @@index([phone])
+}
+
+model PriceGroup {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(50)
+  name String @db.VarChar(120)
+  currency String @default("UAH") @db.Char(3)
+  isDefault Boolean @default(false)
+  prices Price[]
+}
+
+model Price {
+  id String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceGroupId String @db.Uuid
+  priceGroup PriceGroup @relation(fields: [priceGroupId], references: [id], onDelete: Cascade)
+  amount Decimal @db.Decimal(12, 2)
+  validFrom DateTime @default(now())
+  validTo DateTime?
+  createdAt DateTime @default(now())
+  @@index([productId, priceGroupId, validFrom, validTo])
+}
+
+model Warehouse {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(50)
+  name String @db.VarChar(150)
+  address String?
+  status RecordStatus @default(ACTIVE)
+  stocks Stock[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Stock {
+  id String @id @default(uuid()) @db.Uuid
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String @db.Uuid
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantity Decimal @default(0) @db.Decimal(12, 3)
+  reservedQuantity Decimal @default(0) @db.Decimal(12, 3)
+  availableQuantity Decimal @default(0) @db.Decimal(12, 3)
+  updatedAt DateTime @updatedAt
+  @@unique([productId, warehouseId])
+  @@index([warehouseId, availableQuantity])
+}
+
+model Cart {
+  id String @id @default(uuid()) @db.Uuid
+  customerId String? @db.Uuid
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  sessionId String? @unique @db.VarChar(160)
+  status CartStatus @default(ACTIVE)
+  items CartItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId, status])
+}
+
+model CartItem {
+  id String @id @default(uuid()) @db.Uuid
+  cartId String @db.Uuid
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity Decimal @db.Decimal(12, 3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id String @id @default(uuid()) @db.Uuid
+  number String @unique @db.VarChar(40)
+  customerId String? @db.Uuid
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  status OrderStatus @default(PENDING)
+  currency String @default("UAH") @db.Char(3)
+  subtotal Decimal @db.Decimal(12, 2)
+  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  deliveryAmount Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal @db.Decimal(12, 2)
+  customerSnapshot Json
+  items OrderItem[]
+  payments Payment[]
+  delivery Delivery?
+  documents Document[]
+  externalReferences ExternalReference[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String? @db.Uuid
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sku String @db.VarChar(100)
+  name String @db.VarChar(255)
+  unitPrice Decimal @db.Decimal(12, 2)
+  quantity Decimal @db.Decimal(12, 3)
+  lineTotal Decimal @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  @@index([orderId])
+}
+
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount Decimal @db.Decimal(12, 2)
+  currency String @default("UAH") @db.Char(3)
+  status PaymentStatus @default(PENDING)
+  method PaymentMethod
+  provider PaymentProvider
+  providerPaymentId String? @db.VarChar(180)
+  description String?
+  failureReason String?
+  metadata Json?
+  paidAt DateTime?
+  expiresAt DateTime?
+  transactions PaymentTransaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([orderId, status])
+  @@index([provider, providerPaymentId])
+}
+
+model PaymentTransaction {
+  id String @id @default(uuid()) @db.Uuid
+  paymentId String @db.Uuid
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type TransactionType
+  status TransactionStatus @default(PENDING)
+  amount Decimal @db.Decimal(12, 2)
+  providerTransactionId String? @db.VarChar(180)
+  responseCode String? @db.VarChar(80)
+  failureReason String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([paymentId, createdAt])
+  @@index([providerTransactionId])
+}
+
+model Delivery {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @unique @db.Uuid
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status DeliveryStatus @default(PENDING)
+  provider String? @db.VarChar(80)
+  providerShipmentId String? @db.VarChar(180)
+  trackingNumber String? @db.VarChar(120)
+  recipientName String? @db.VarChar(180)
+  recipientPhone String? @db.VarChar(40)
+  address Json
+  shippedAt DateTime?
+  deliveredAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([trackingNumber])
+}
+
+model Document {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type DocumentType
+  number String? @db.VarChar(80)
+  url String?
+  issuedAt DateTime @default(now())
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([orderId, type])
+}
+
+model ExternalReference {
+  id String @id @default(uuid()) @db.Uuid
+  system String @db.VarChar(80)
+  entityType String @db.VarChar(80)
+  externalId String @db.VarChar(180)
+  productId String? @db.Uuid
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId String? @db.Uuid
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId String? @db.Uuid
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([system, entityType, externalId])
+  @@index([productId])
+  @@index([customerId])
+  @@index([orderId])
+}
+
+model SyncLog {
+  id String @id @default(uuid()) @db.Uuid
+  system String @db.VarChar(80)
+  entityType String @db.VarChar(80)
+  entityId String? @db.VarChar(180)
+  direction SyncDirection
+  status SyncStatus @default(PENDING)
+  request Json?
+  response Json?
+  errorMessage String?
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  @@index([system, status, startedAt])
+}

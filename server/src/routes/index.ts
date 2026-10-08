@@ -1,0 +1,21 @@
+import { Router } from 'express';
+import { productController } from '../controllers/product.controller.js';
+import { catalogController } from '../controllers/catalog.controller.js';
+import { cartController } from '../controllers/cart.controller.js';
+
+export const apiRouter = Router();
+apiRouter.get('/products', productController.list);
+apiRouter.get('/cart', cartController.get);
+apiRouter.post('/cart/items', cartController.add);
+apiRouter.patch('/cart/items/:id', cartController.update);
+apiRouter.delete('/cart/items/:id', cartController.remove);
+apiRouter.post('/products', productController.create);
+apiRouter.get('/products/:id', productController.get);
+apiRouter.get('/categories', catalogController.categories);
+apiRouter.get('/brands', catalogController.brands);
+apiRouter.get('/customers', catalogController.customers);
+apiRouter.post('/customers', catalogController.createCustomer);
+apiRouter.get('/customers/:id', catalogController.customer);
+apiRouter.get('/orders', catalogController.orders);
+apiRouter.post('/orders', catalogController.createOrder);
+apiRouter.get('/orders/:id', catalogController.order);
