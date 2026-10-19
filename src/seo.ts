@@ -1,6 +1,7 @@
 import type { Product } from './types';
 
-export const SITE_ORIGIN = (import.meta.env.VITE_SITE_URL || 'https://tvd.vn.ua').replace(/\/+$/, '');
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+export const SITE_ORIGIN = `${(import.meta.env.VITE_SITE_URL || 'https://tvd.vn.ua').replace(/\/+$/, '')}${basePath}`;
 
 const transliteration: Record<string, string> = { а:'a', б:'b', в:'v', г:'h', ґ:'g', д:'d', е:'e', є:'ye', ж:'zh', з:'z', и:'y', і:'i', ї:'yi', й:'y', к:'k', л:'l', м:'m', н:'n', о:'o', п:'p', р:'r', с:'s', т:'t', у:'u', ф:'f', х:'kh', ц:'ts', ч:'ch', ш:'sh', щ:'shch', ь:'', ю:'yu', я:'ya' };
 

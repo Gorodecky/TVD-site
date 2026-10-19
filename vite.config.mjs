@@ -256,6 +256,7 @@ function knowledgeContent(isBuild) {
 
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, root, '');
-  configuredSiteOrigin = (env.VITE_SITE_URL || 'https://tvd.vn.ua').replace(/\/+$/, '');
-  return { plugins: [knowledgeContent(command === 'build')] };
+  const base = process.env.VITE_BASE_PATH || '/';
+  configuredSiteOrigin = `${(env.VITE_SITE_URL || 'https://tvd.vn.ua').replace(/\/+$/, '')}${base === '/' ? '' : base.replace(/\/$/, '')}`;
+  return { base, plugins: [knowledgeContent(command === 'build')] };
 });

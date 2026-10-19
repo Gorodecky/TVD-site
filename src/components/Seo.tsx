@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { buildOrganizationSchema, buildWebSiteSchema, safeJsonLd } from '../seo';
+import { buildOrganizationSchema, buildWebSiteSchema, safeJsonLd, SITE_ORIGIN } from '../seo';
 
 export type SeoProps = { title: string; description: string; path: string; image?: string; type?: 'website' | 'article'; noIndex?: boolean; noCanonical?: boolean; schemas?: unknown[] };
 
@@ -12,7 +12,7 @@ function meta(name: string, content: string, property = false) {
 
 export default function Seo({ title, description, path, image = '/logo_tvd_new2.png', type = 'website', noIndex = false, noCanonical = false, schemas = [] }: SeoProps) {
   useEffect(() => {
-    const origin = (import.meta.env.VITE_SITE_URL || window.location.origin).replace(/\/+$/, '');
+    const origin = SITE_ORIGIN.startsWith('https://tvd.vn.ua') && !import.meta.env.VITE_SITE_URL ? window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, '') : SITE_ORIGIN;
     const canonicalUrl = `${origin}${path}`;
     document.title = title;
     meta('description', description);

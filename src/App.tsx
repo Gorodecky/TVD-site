@@ -16,12 +16,13 @@ import KnowledgeArticlePage from './pages/KnowledgeArticlePage';
 import { knowledgeRepository } from './knowledge/content';
 import { knowledgeCategories } from './knowledge/types';
 import { buildArticleSchema, buildBreadcrumbSchema, buildProductSchema, productPath } from './seo';
+import { fromBase, withBase } from './paths';
 
 type Route = { page: Page; slug: string; productId: string };
 const categoryPath = '/catalog/radiatory';
 const staticRoutes: Record<string, Page> = { '/':'home', '/catalog':'category', '/category':'category', [categoryPath]:'category', '/cart':'cart', '/account':'account', '/brands':'brands', '/solutions':'solutions', '/cooperation':'cooperation', '/support':'support', '/about':'about', '/selection-assistant':'assistant', '/knowledge':'knowledge' };
 function routeFromPath(): Route {
-  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const pathname = fromBase(window.location.pathname).replace(/\/+$/, '') || '/';
   const article = pathname.match(/^\/knowledge\/([^/]+)$/);
   if (article) return { page:'knowledge-article', slug:decodeURIComponent(article[1]), productId:'' };
   const knowledgeCategory = pathname.match(/^\/knowledge\/category\/([^/]+)$/);
@@ -45,7 +46,7 @@ const pageSeo: Partial<Record<Page, { title:string; description:string }>> = {
 };
 const infoPageFor = (page:Page) => page === 'brands' || page === 'solutions' || page === 'cooperation' || page === 'support' || page === 'about';
 
-function NotFound() { return <section className="wrap page-content"><p className="eyebrow">404 · СТОРІНКУ НЕ ЗНАЙДЕНО</p><h1>Такої сторінки немає</h1><p>Перевірте адресу або поверніться до каталогу TVD.</p><a className="button button-red" href="/">На головну</a></section>; }
+function NotFound() { return <section className="wrap page-content"><p className="eyebrow">404 · СТОРІНКУ НЕ ЗНАЙДЕНО</p><h1>Такої сторінки немає</h1><p>Перевірте адресу або поверніться до каталогу TVD.</p><a className="button button-red" href={withBase('/')}>На головну</a></section>; }
 
 function App() {
   const [route, setRoute] = useState<Route>(routeFromPath);
@@ -69,14 +70,14 @@ function App() {
       : nextPage === 'category' ? categoryPath : ({ home:'/',cart:'/cart',account:'/account',brands:'/brands',solutions:'/solutions',cooperation:'/cooperation',support:'/support',about:'/about',assistant:'/selection-assistant',knowledge:'/knowledge' } as Partial<Record<Page,string>>)[nextPage] ?? '/';
     const next = routeFromPathFor(nextPage, nextSlug);
     setRoute(next); setMenu(false);
-    if (window.location.pathname !== path || window.location.search) window.history.pushState({}, '', path);
+    if (window.location.pathname !== withBase(path) || window.location.search) window.history.pushState({}, '', withBase(path));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const openArticle = (articleSlug: string) => go('knowledge-article', articleSlug);
   const search = (value: string) => { setSearchQuery(value); void loadCatalog(value.trim() ? { q: value.trim() } : {}); go('category'); };
   const add = (product: Product) => { void addCartItem(product.id).then(setCart).catch(e=>alert(e.message)); };
   const refreshCart=()=>getCart().then(setCart);
-  const showProduct = (product: Product) => { setActiveProduct(product); const path=productPath(product); const parts=path.split('/'); setRoute({page:'product',slug:parts[parts.length-1] ?? '',productId:product.id}); setMenu(false); if(window.location.pathname!==path||window.location.search)window.history.pushState({},'',path); window.scrollTo({top:0,behavior:'smooth'}); };
+  const showProduct = (product: Product) => { setActiveProduct(product); const path=productPath(product); const parts=path.split('/'); setRoute({page:'product',slug:parts[parts.length-1] ?? '',productId:product.id}); setMenu(false); if(window.location.pathname!==withBase(path)||window.location.search)window.history.pushState({},'',withBase(path)); window.scrollTo({top:0,behavior:'smooth'}); };
 
   const article = page === 'knowledge-article' ? knowledgeRepository.getBySlug(slug) : undefined;
   const selectedKnowledgeCategory = page === 'knowledge-category' ? knowledgeCategories.find((item) => item.slug === slug) : undefined;
@@ -100,7 +101,7 @@ function App() {
     <Header menu={menu} cartCount={cartCount} query={query} setMenu={setMenu} setQuery={setQuery} go={go} onSearch={search} />
     <main>{page === 'home' ? <HomePage products={catalog} loading={catalogLoading} error={catalogError} retry={loadCatalog} add={add} showProduct={showProduct} go={go} articles={knowledgeRepository.recommended(3)} onArticle={openArticle} />
       : page === 'category' ? <RadiatorCategoryPage products={catalog} loading={catalogLoading} error={catalogError} retry={loadCatalog} onProduct={showProduct} add={add} initialSearch={searchQuery} onAssistant={()=>go('assistant')} />
-      : page === 'product' ? currentProduct ? <ProductPage product={currentProduct} add={add} /> : <section className="wrap page-content"><h1>{catalogLoading?'Завантажуємо товар…':'Товар не знайдено'}</h1>{!catalogLoading&&<a className="button button-red" href={categoryPath}>До каталогу</a>}</section>
+      : page === 'product' ? currentProduct ? <ProductPage product={currentProduct} add={add} /> : <section className="wrap page-content"><h1>{catalogLoading?'Завантажуємо товар…':'Товар не знайдено'}</h1>{!catalogLoading&&<a className="button button-red" href={withBase(categoryPath)}>До каталогу</a>}</section>
       : page === 'cart' ? <CartPage cart={cart} refresh={refreshCart} update={(id,q)=>updateCartItem(id,q).then(setCart)} remove={id=>removeCartItem(id).then(setCart)} go={go} />
       : page === 'account' ? <AccountPage />
       : page === 'assistant' ? <SelectionAssistantPage go={go} />
