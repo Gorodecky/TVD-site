@@ -4,7 +4,7 @@ import MegaMenu from '../navigation/MegaMenu';
 import type { Page } from '../../types';
 
 type Props = { menu: boolean; cartCount: number; query: string; setMenu: (open: boolean) => void; setQuery: (query: string) => void; go: (page: Page) => void; onSearch: (query:string)=>void };
-const links: {label:string;page:Page}[] = [{label:'Бренди',page:'brands'},{label:'Інженерні рішення',page:'solutions'},{label:'Співпраця',page:'cooperation'},{label:'Сервіс і підтримка',page:'support'},{label:'Про компанію',page:'about'}];
+const links: {label:string;page:Page}[] = [{label:'Бренди',page:'brands'},{label:'Інженерні рішення',page:'solutions'},{label:'База знань',page:'knowledge'},{label:'Співпраця',page:'cooperation'},{label:'Сервіс і підтримка',page:'support'},{label:'Про компанію',page:'about'}];
 export default function Header({ menu, cartCount, query, setMenu, setQuery, go, onSearch }: Props) {
   const [mobileNav,setMobileNav]=useState(false);
   const b2bUrl=import.meta.env.VITE_B2B_URL as string|undefined;
