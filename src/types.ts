@@ -1,2 +1,2 @@
-export type Page = 'home' | 'category' | 'product' | 'cart' | 'account';
+export type Page = 'home' | 'category' | 'product' | 'cart' | 'account' | 'brands' | 'solutions' | 'cooperation' | 'support' | 'about' | 'assistant';
 export type Product = { id:string; name:string; brand:string; code:string; price:number; oldPrice?:number; badge?:string; image:string; stock:string; priceCurrency?:'UAH'|'source'; internalCode?:string|null; article?:string|null; connection?:'K'|'VK'; model?:string; heightMm?:number; widthMm?:number; powerW?:number|null; stockQty?:number|null };

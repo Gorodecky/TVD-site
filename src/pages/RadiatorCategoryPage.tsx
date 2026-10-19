@@ -4,13 +4,13 @@ import type { Product } from '../types';
 import ProductCard from '../components/catalog/ProductCard';
 import Breadcrumbs from '../components/catalog/Breadcrumbs';
 
-export default function RadiatorCategoryPage({products,loading,error,retry,onProduct,add}:{products:Product[];loading:boolean;error:string;retry:(filters?:Record<string,string|number>)=>void;onProduct:(p:Product)=>void;add:(p:Product)=>void}) {
+export default function RadiatorCategoryPage({products,loading,error,retry,onProduct,add,initialSearch='',onAssistant}:{products:Product[];loading:boolean;error:string;retry:(filters?:Record<string,string|number>)=>void;onProduct:(p:Product)=>void;add:(p:Product)=>void;initialSearch?:string;onAssistant:()=>void}) {
   const radiators=products.filter(p=>p.connection);
   const [connection,setConnection]=useState<'all'|'K'|'VK'>('all');
   const [brand,setBrand]=useState('all');
   const [model,setModel]=useState('all');
   const [height,setHeight]=useState('all');
-  const [search,setSearch]=useState('');
+  const [search,setSearch]=useState(initialSearch);
   const [sort,setSort]=useState('price-low');
   const [limit,setLimit]=useState(24);
   useEffect(()=>{const timer=window.setTimeout(()=>{const filters:Record<string,string|number>={};if(connection!=='all')filters.connection=connection;if(brand!=='all')filters.brand=brand;if(model!=='all')filters.model=model;if(height!=='all')filters.height=Number(height);if(search.trim())filters.q=search.trim();if(sort!=='price-low')filters.sort=sort;retry(filters);},250);return()=>window.clearTimeout(timer);},[connection,brand,model,height,search,sort,retry]);
@@ -24,6 +24,8 @@ export default function RadiatorCategoryPage({products,loading,error,retry,onPro
   return <div className="wrap page-content radiator-page">
     <Breadcrumbs items={[{ label: 'Головна' }, { label: 'Опалення' }, { label: 'Радіатори' }, { label: 'Сталеві', current: true }]} />
     <div className="page-title"><div><p className="eyebrow">КАТАЛОГ TVD · ВИПИСКА 1С</p><h1>Сталеві панельні радіатори</h1><p>Terra Teknik та Rens · підбір за типом підключення й розміром</p></div><span className="result-count">{filtered.length} товарів</span></div>
+    <div className="category-assist-row"><span><b>Шукаєте рішення для системи?</b><small>Майбутній підбір допоможе сформувати запит фахівцю.</small></span><button className="button outline-button" onClick={onAssistant}>Підбір обладнання <ChevronRight size={16}/></button></div>
+    <div className="selection-shortcuts"><span>Швидкий перехід:</span>{['Теплові насоси','Котли','Насоси'].map(name=><button key={name} onClick={onAssistant}>{name}<ChevronRight size={14}/></button>)}</div>
     <div className="connection-picks">
       <button className={connection==='K'?'connection-card selected':'connection-card'} onClick={()=>{setConnection(connection==='K'?'all':'K');setLimit(24);}}><img src="/radiator-k.png" alt="Радіатор з боковим підключенням"/><span><b>Бокове підключення · K</b><small>{countFor('K')} моделей</small></span><ChevronRight size={17}/></button>
       <button className={connection==='VK'?'connection-card selected':'connection-card'} onClick={()=>{setConnection(connection==='VK'?'all':'VK');setLimit(24);}}><img src="/radiator-vk.png" alt="Радіатор з нижнім підключенням"/><span><b>Нижнє підключення · VK</b><small>{countFor('VK')} моделей</small></span><ChevronRight size={17}/></button>
