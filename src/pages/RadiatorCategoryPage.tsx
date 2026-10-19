@@ -6,12 +6,13 @@ import Breadcrumbs from '../components/catalog/Breadcrumbs';
 
 export default function RadiatorCategoryPage({products,loading,error,retry,onProduct,add,initialSearch='',onAssistant}:{products:Product[];loading:boolean;error:string;retry:(filters?:Record<string,string|number>)=>void;onProduct:(p:Product)=>void;add:(p:Product)=>void;initialSearch?:string;onAssistant:()=>void}) {
   const radiators=products.filter(p=>p.connection);
-  const [connection,setConnection]=useState<'all'|'K'|'VK'>('all');
-  const [brand,setBrand]=useState('all');
-  const [model,setModel]=useState('all');
-  const [height,setHeight]=useState('all');
-  const [search,setSearch]=useState(initialSearch);
-  const [sort,setSort]=useState('price-low');
+  const params=new URLSearchParams(window.location.search);
+  const [connection,setConnection]=useState<'all'|'K'|'VK'>(()=>params.get('connection')==='K'||params.get('connection')==='VK'?params.get('connection') as 'K'|'VK':'all');
+  const [brand,setBrand]=useState(()=>params.get('brand')??'all');
+  const [model,setModel]=useState(()=>params.get('model')??'all');
+  const [height,setHeight]=useState(()=>params.get('height')??'all');
+  const [search,setSearch]=useState(()=>params.get('q')??initialSearch);
+  const [sort,setSort]=useState(()=>params.get('sort')??'price-low');
   const [limit,setLimit]=useState(24);
   useEffect(()=>{const timer=window.setTimeout(()=>{const filters:Record<string,string|number>={};if(connection!=='all')filters.connection=connection;if(brand!=='all')filters.brand=brand;if(model!=='all')filters.model=model;if(height!=='all')filters.height=Number(height);if(search.trim())filters.q=search.trim();if(sort!=='price-low')filters.sort=sort;retry(filters);},250);return()=>window.clearTimeout(timer);},[connection,brand,model,height,search,sort,retry]);
   const countFor=(kind:'K'|'VK')=>radiators.filter(p=>p.connection===kind).length;

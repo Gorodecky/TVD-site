@@ -5,7 +5,7 @@ export default function ProductPage({product:p,add}:{product:Product;add:(p:Prod
   const isRadiator=Boolean(p.connection);
   const connectionLabel=p.connection==='K'?'Бокове підключення · K':'Нижнє підключення · VK';
   const stockKnown=p.stockQty!==null&&p.stockQty!==undefined;
-  return <div className="wrap page-content"><div className="breadcrumbs"><span>Головна</span><ChevronRight size={13}/><span>Опалення</span><ChevronRight size={13}/><span>Радіатори</span><ChevronRight size={13}/><b>{p.brand}</b></div>
+  return <div className="wrap page-content"><nav className="breadcrumbs" aria-label="Навігаційний шлях"><a href="/">Головна</a><ChevronRight size={13}/><span>Опалення</span><ChevronRight size={13}/><a href="/catalog/radiatory">Радіатори</a><ChevronRight size={13}/><b>{p.brand}</b></nav>
     <div className="detail-layout"><div className="detail-image"><img src={p.image} alt={p.name}/>{p.connection&&<span className="badge">{p.connection==='K'?'Бокове K':'Нижнє VK'}</span>}</div>
       <div className="detail-info"><p className="eyebrow">{p.brand.toUpperCase()}</p><h1>{p.name}</h1>{p.connection&&<div className="connection-label">{connectionLabel}</div>}
         <span className="sku">Артикул: {p.code}{p.internalCode&&<span> · Код 1С: {p.internalCode}</span>}</span>

@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+let configuredSiteOrigin = 'https://tvd.vn.ua';
 const articlesRoot = path.join(root, 'content/knowledge/articles');
 const categories = new Set(['heat-pumps', 'gas-boilers', 'alternative-heating', 'wastewater-treatment']);
 const statuses = new Set(['draft', 'published']);
@@ -157,8 +158,9 @@ function collectMarkdown(directory) {
   });
 }
 
-function knowledgeContent() {
+function knowledgeContent(isBuild) {
   let indexSource = 'export const knowledgeArticles = [];';
+  let publishedArticles = [];
   const refreshIndex = () => {
     const files = collectMarkdown(articlesRoot);
     const articles = files.map(readArticle);
@@ -168,16 +170,92 @@ function knowledgeContent() {
       seen.set(article.slug, files[index]);
     }
     const today = new Date().toISOString().slice(0, 10);
-    const published = articles.filter((article) => article.status === 'published' && article.publishedAt <= today).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-    indexSource = `export const knowledgeArticles = ${JSON.stringify(published)};`;
+    publishedArticles = articles.filter((article) => article.status === 'published' && article.publishedAt <= today).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+    indexSource = `export const knowledgeArticles = ${JSON.stringify(publishedArticles)};`;
   };
+  const htmlEscape = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  const slugify = (value) => value.toLocaleLowerCase('uk-UA').replace(/[а-яіїєґ]/g, (character) => ({а:'a',б:'b',в:'v',г:'h',ґ:'g',д:'d',е:'e',є:'ye',ж:'zh',з:'z',и:'y',і:'i',ї:'yi',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'shch',ь:'',ю:'yu',я:'ya'}[character])).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const schema = (value) => JSON.stringify(value).replaceAll('<', '\\u003c');
+  const staticPages = [
+    {path:'/',title:'TVD — інженерне обладнання для опалення, води та клімату',description:'Обладнання для опалення, водопостачання та клімату. TVD — підтримка інженерних проєктів у Вінниці та доставка по Україні.',heading:'Надійна основа для ваших рішень.',body:'Обладнання для опалення, водопостачання та клімату. Допомагаємо професіоналам знаходити потрібне й реалізовувати інженерні проєкти.'},
+    {path:'/catalog/radiatory',title:'Сталеві панельні радіатори — каталог TVD',description:'Каталог сталевих панельних радіаторів Terra Teknik і Rens. Перегляньте моделі, розміри, типи підключення й характеристики товарів TVD.',heading:'Сталеві панельні радіатори',body:'Terra Teknik та Rens · підбір за типом підключення й розміром.'},
+    {path:'/knowledge',title:'База знань TVD — інженерні системи та обладнання',description:'Матеріали TVD про теплові насоси, газові котли, альтернативне опалення та очищення стічних вод.',heading:'База знань',body:'Матеріали про обладнання та інженерні системи від команди TVD.'},
+    {path:'/brands',title:'Бренди інженерного обладнання — TVD',description:'Бренди, представлені в каталозі інженерного обладнання TVD.',heading:'Бренди',body:'Перегляньте бренди товарів у каталозі TVD.'},
+    {path:'/solutions',title:'Інженерні рішення — TVD',description:'Інженерні рішення та обладнання для опалення, водопостачання і клімату від TVD.',heading:'Інженерні рішення',body:'Обладнання для систем опалення, водопостачання та клімату.'},
+    {path:'/cooperation',title:'Співпраця з TVD — Вінниця та Україна',description:'Умови співпраці з TVD для магазинів, оптових партнерів та монтажних організацій у Вінниці й області.',heading:'Співпраця з TVD',body:'Для магазинів, оптових партнерів і монтажних організацій Вінниці та області.'},
+    {path:'/support',title:'Сервіс і технічна підтримка — TVD',description:'Технічна підтримка та консультації щодо інженерного обладнання TVD.',heading:'Сервіс і підтримка',body:'Технічна інформація та підтримка для ваших інженерних проєктів.'},
+    {path:'/about',title:'Про компанію TVD — інженерні системи',description:'TVD — постачальник обладнання для опалення, водопостачання, вентиляції та клімату.',heading:'Про компанію TVD',body:'Постачальник інженерного обладнання у Вінниці та з доставкою по Україні.'},
+    {path:'/selection-assistant',title:'Підбір обладнання — TVD',description:'Інформаційна сторінка майбутнього помічника з підбору обладнання TVD.',heading:'Підбір обладнання',body:'Майбутній інструмент збору вихідних даних для консультації з фахівцем TVD.'},
+  ];
+  function buildHtml(template, {path:routePath, title, description, body, schemaData, noIndex = false, noCanonical = false, image = '/logo_tvd_new2.png', type = 'website'}) {
+    const origin = configuredSiteOrigin;
+    const canonical = `${origin}${routePath}`;
+    let html = template.replace(/<title>[^<]*<\/title>/, `<title>${htmlEscape(title)}</title>`)
+      .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${htmlEscape(description)}" />`)
+      .replace('</head>', `<meta name="robots" content="${noIndex ? 'noindex,follow' : 'index,follow'}" />${noCanonical ? '' : `<link rel="canonical" href="${htmlEscape(canonical)}" />`}<meta property="og:type" content="${type}" /><meta property="og:locale" content="uk_UA" /><meta property="og:site_name" content="TVD" /><meta property="og:title" content="${htmlEscape(title)}" /><meta property="og:description" content="${htmlEscape(description)}" /><meta property="og:url" content="${htmlEscape(canonical)}" /><meta property="og:image" content="${htmlEscape(`${origin}${image}`)}" /><meta name="twitter:card" content="summary_large_image" /><script type="application/ld+json">${schema(schemaData)}</script></head>`)
+      .replace('<div id="root"></div>', `<div id="root"><main class="wrap page-content"><h1>${htmlEscape(body.heading)}</h1>${body.html ?? `<p>${htmlEscape(body.text ?? '')}</p>`}</main></div>`);
+    return html;
+  }
+  function staticRender() {
+    const dist = path.join(root, 'dist');
+    const template = readFileSync(path.join(dist, 'index.html'), 'utf8');
+    const origin = configuredSiteOrigin;
+    const org = {'@context':'https://schema.org','@type':'Organization',name:'TVD',url:`${origin}/`,logo:`${origin}/logo_tvd_new2.png`,areaServed:{'@type':'Country',name:'Україна'}};
+    const website = {'@context':'https://schema.org','@type':'WebSite',name:'TVD — Інженерні системи',url:`${origin}/`,inLanguage:'uk-UA',potentialAction:{'@type':'SearchAction',target:`${origin}/catalog/radiatory?q={search_term_string}`,'query-input':'required name=search_term_string'}};
+    const allUrls = [];
+    const breadcrumbs = (parts) => ({'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:parts.map((item,index)=>({'@type':'ListItem',position:index+1,name:item.name,item:`${origin}${item.path}`}))});
+    const writeRoute = (routePath, title, description, body, extraSchemas = [], options = {}) => {
+      const destination = routePath === '/' ? path.join(dist, 'index.html') : path.join(dist, routePath.slice(1), 'index.html');
+      mkdirSync(path.dirname(destination), {recursive:true});
+      writeFileSync(destination, buildHtml(template,{path:routePath,title,description,body,schemaData:[org,website,...extraSchemas],...options}));
+      if (!options.noIndex) allUrls.push({path:routePath,lastmod:options.lastmod});
+    };
+    for (const page of staticPages) {
+      const articleLinks = page.path === '/knowledge' ? publishedArticles.map(article=>`<li><a href="/knowledge/${encodeURIComponent(article.slug)}">${htmlEscape(article.title)}</a><p>${htmlEscape(article.description)}</p></li>`).join('') : '';
+      const topicLinks = page.path === '/knowledge' ? ['heat-pumps','gas-boilers','alternative-heating','wastewater-treatment'].map(category=>`<li><a href="/knowledge/category/${category}">${category}</a></li>`).join('') : '';
+      const productLinks = page.path === '/catalog/radiatory' ? JSON.parse(readFileSync(path.join(root,'src/radiators.json'),'utf8')).map(product=>`<li><a href="/catalog/radiatory/${slugify(product.name)}-${encodeURIComponent(product.id)}">${htmlEscape(product.name)} — ${htmlEscape(product.brand)}</a></li>`).join('') : '';
+      const html = page.path === '/knowledge' ? `<p>${htmlEscape(page.body)}</p><h2>Категорії матеріалів</h2><ul>${topicLinks}</ul><h2>Опубліковані статті</h2><ul>${articleLinks}</ul>` : page.path === '/catalog/radiatory' ? `<p>${htmlEscape(page.body)}</p><ul>${productLinks}</ul>` : undefined;
+      const extra = page.path === '/catalog/radiatory' ? [breadcrumbs([{name:'Головна',path:'/'},{name:'Каталог радіаторів',path:page.path}])] : [];
+      writeRoute(page.path,page.title,page.description,{heading:page.heading,html},extra);
+    }
+    for (const category of ['heat-pumps','gas-boilers','alternative-heating','wastewater-treatment']) {
+      const titles={'heat-pumps':'Теплові насоси','gas-boilers':'Газові котли','alternative-heating':'Альтернативне опалення','wastewater-treatment':'Очищення стічних вод'};
+      const related=publishedArticles.filter(article=>article.category===category);
+      const routePath=`/knowledge/category/${category}`;
+      const html=related.map(article=>`<article><h2><a href="/knowledge/${encodeURIComponent(article.slug)}">${htmlEscape(article.title)}</a></h2><p>${htmlEscape(article.description)}</p></article>`).join('') || '<p>Матеріали цієї теми буде опубліковано пізніше.</p>';
+      writeRoute(routePath,`${titles[category]} — База знань TVD`,`Матеріали TVD: ${titles[category].toLocaleLowerCase('uk-UA')}.`,{heading:titles[category],html},[breadcrumbs([{name:'Головна',path:'/'},{name:'База знань',path:'/knowledge'},{name:titles[category],path:routePath}])],{noIndex:related.length===0});
+    }
+    for (const article of publishedArticles) {
+      const routePath=`/knowledge/${article.slug}`;
+      const articleSchema={'@context':'https://schema.org','@type':'Article',headline:article.title,description:article.description,image:[`${origin}${article.cover}`],author:{'@type':'Organization',name:article.author},publisher:org,datePublished:article.publishedAt,dateModified:article.updatedAt,mainEntityOfPage:`${origin}${routePath}`,inLanguage:'uk-UA'};
+      const bodyHtml=`<p>${htmlEscape(article.description)}</p><img src="${htmlEscape(article.cover)}" alt="${htmlEscape(article.title)}" /><div>${article.html}</div>`;
+      writeRoute(routePath,`${article.title} — База знань TVD`,article.description,{heading:article.title,html:bodyHtml},[articleSchema,breadcrumbs([{name:'Головна',path:'/'},{name:'База знань',path:'/knowledge'},{name:article.title,path:routePath}])],{image:article.cover,type:'article',lastmod:article.updatedAt});
+    }
+    const products=JSON.parse(readFileSync(path.join(root,'src/radiators.json'),'utf8'));
+    for (const product of products) {
+      const routePath=`/catalog/radiatory/${slugify(product.name)}-${encodeURIComponent(product.id)}`;
+      const productSchema={'@context':'https://schema.org','@type':'Product',name:product.name,image:[`${origin}${product.image}`],sku:product.article,brand:{'@type':'Brand',name:product.brand},url:`${origin}${routePath}`};
+      const specs=[['Бренд',product.brand],['Тип',product.model],['Підключення',product.connection],['Розмір',`${product.heightMm} × ${product.widthMm} мм`],['Теплова потужність',`${product.powerW} Вт`]].filter(([,value])=>value != null).map(([key,value])=>`<li><b>${htmlEscape(key)}:</b> ${htmlEscape(value)}</li>`).join('');
+      writeRoute(routePath,`${product.name} — ${product.brand} | TVD`,`Товар ${product.name}, бренд ${product.brand}. Артикул: ${product.article}. Характеристики та актуальну наявність уточнюйте у каталозі TVD.`,{heading:product.name,html:`<p>Бренд: ${htmlEscape(product.brand)} · Артикул: ${htmlEscape(product.article)}</p><h2>Характеристики</h2><ul>${specs}</ul><a href="/catalog/radiatory">До каталогу радіаторів</a>`},[productSchema,breadcrumbs([{name:'Головна',path:'/'},{name:'Каталог радіаторів',path:'/catalog/radiatory'},{name:product.name,path:routePath}])],{image:product.image});
+    }
+    const notFound=buildHtml(template,{path:'/404.html',title:'Сторінку не знайдено — TVD',description:'Запитувану сторінку TVD не знайдено.',body:{heading:'Сторінку не знайдено',text:'Перевірте адресу або поверніться на головну сторінку TVD.'},schemaData:[org,website],noIndex:true,noCanonical:true});
+    writeFileSync(path.join(dist,'404.html'),notFound);
+    writeFileSync(path.join(dist,'robots.txt'),`User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`);
+    const sitemap=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${allUrls.map(item=>`  <url><loc>${htmlEscape(`${origin}${item.path}`)}</loc>${item.lastmod?`<lastmod>${item.lastmod}</lastmod>`:''}</url>`).join('\n')}\n</urlset>\n`;
+    writeFileSync(path.join(dist,'sitemap.xml'),sitemap);
+  }
   return {
     name: 'tvd-markdown-knowledge',
     resolveId(id) { return id === virtualId ? resolvedVirtualId : null; },
     load(id) { if (id === resolvedVirtualId) return indexSource; return null; },
     buildStart() { refreshIndex(); },
     handleHotUpdate({ file, server }) { if (file.startsWith(articlesRoot)) { refreshIndex(); server.moduleGraph.invalidateAll(); server.ws.send({ type: 'full-reload' }); return []; } return null; },
+    closeBundle() { if (isBuild) staticRender(); },
   };
 }
 
-export default defineConfig({ plugins: [knowledgeContent()] });
+export default defineConfig(({ mode, command }) => {
+  const env = loadEnv(mode, root, '');
+  configuredSiteOrigin = (env.VITE_SITE_URL || 'https://tvd.vn.ua').replace(/\/+$/, '');
+  return { plugins: [knowledgeContent(command === 'build')] };
+});
