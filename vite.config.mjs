@@ -159,23 +159,24 @@ function collectMarkdown(directory) {
 
 function knowledgeContent() {
   let indexSource = 'export const knowledgeArticles = [];';
+  const refreshIndex = () => {
+    const files = collectMarkdown(articlesRoot);
+    const articles = files.map(readArticle);
+    const seen = new Map();
+    for (const [index, article] of articles.entries()) {
+      if (seen.has(article.slug)) throw new Error(`Slug "${article.slug}" повторюється у ${path.relative(root, seen.get(article.slug))} та ${path.relative(root, files[index])}`);
+      seen.set(article.slug, files[index]);
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const published = articles.filter((article) => article.status === 'published' && article.publishedAt <= today).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+    indexSource = `export const knowledgeArticles = ${JSON.stringify(published)};`;
+  };
   return {
     name: 'tvd-markdown-knowledge',
     resolveId(id) { return id === virtualId ? resolvedVirtualId : null; },
     load(id) { if (id === resolvedVirtualId) return indexSource; return null; },
-    buildStart() {
-      const files = collectMarkdown(articlesRoot);
-      const articles = files.map(readArticle);
-      const seen = new Map();
-      for (const [index, article] of articles.entries()) {
-        if (seen.has(article.slug)) throw new Error(`Slug "${article.slug}" повторюється у ${path.relative(root, seen.get(article.slug))} та ${path.relative(root, files[index])}`);
-        seen.set(article.slug, files[index]);
-      }
-      const today = new Date().toISOString().slice(0, 10);
-      const published = articles.filter((article) => article.status === 'published' && article.publishedAt <= today).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-      indexSource = `export const knowledgeArticles = ${JSON.stringify(published)};`;
-    },
-    handleHotUpdate({ file, server }) { if (file.startsWith(articlesRoot)) { server.moduleGraph.invalidateAll(); server.ws.send({ type: 'full-reload' }); return []; } return null; },
+    buildStart() { refreshIndex(); },
+    handleHotUpdate({ file, server }) { if (file.startsWith(articlesRoot)) { refreshIndex(); server.moduleGraph.invalidateAll(); server.ws.send({ type: 'full-reload' }); return []; } return null; },
   };
 }
 
